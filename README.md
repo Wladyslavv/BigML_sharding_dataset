@@ -18,6 +18,9 @@ Research focused on improving model performance in multi-turn dialogues and addr
 
 ### Existing Works
 
+* **ConsistentChat: Building Skeleton-Guided Consistent Multi-Turn Dialogues for Large Language Models from Scratch** [📄 Paper](https://arxiv.org/abs/2506.03558)  
+    > **Summary:** Proposes a skeleton-guided framework to construct high-quality multi-turn datasets from scratch. The construction method operates in two stages: (1) mapping conversations into 9 predefined intent trajectories to generate a globally coherent sequence of user queries (the "skeleton"), and (2) employing a single-pass Chain-of-Thought (CoT) generation strategy to synthesize all AI responses simultaneously. This prevents context drift and ensures strong cross-turn consistency. 
+
 * **LLMs Get Lost In Multi-Turn Conversations** [📄 Paper](https://arxiv.org/abs/2505.06120)  
     > **Summary:** When converting complicated questions into a multi-turn format, models often fail to answer correctly, leading to a 35% performance degradation.
 
@@ -31,6 +34,7 @@ Research focused on improving model performance in multi-turn dialogues and addr
 
 | Dataset | Type/Domain | Link/Source |
 | :--- | :--- | :--- |
+| **ConsistentChat** | Multi-turn Dialogue | [Hugging Face](https://huggingface.co/datasets/jiawei-ucas/ConsistentChat) |
 | **LiC** | Math, Code, Database, Action | `microsoft/lost_in_conversation` |
 | **M2Lingual** | Multilingual | - |
 | **SkillMix** | Instruction Tuning | `PrincetonPLI/Instruct-SkillMix-SDD` |
@@ -42,7 +46,6 @@ Research focused on improving model performance in multi-turn dialogues and addr
 | **MIRAGE** | Benchmark | `MIRAGE-Benchmark/MIRAGE` |
 | **MIMIC-IT** | Instruction Tuning | - |
 | **M3T** | Multimodal | *(Unreleased)* |
-
 ---
 
 ## Multimodal Embedding
