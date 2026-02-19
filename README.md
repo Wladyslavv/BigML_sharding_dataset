@@ -35,6 +35,7 @@ Research focused on improving model performance in multi-turn dialogues and addr
 | Dataset | Type/Domain | Link/Source |
 | :--- | :--- | :--- |
 | **ConsistentChat** | Multi-turn Dialogue | [Hugging Face](https://huggingface.co/datasets/jiawei-ucas/ConsistentChat) |
+| **UltraChat** | Chat/Instruction | [Hugging Face](https://huggingface.co/datasets/openbmb/UltraChat) |
 | **LiC** | Math, Code, Database, Action | `microsoft/lost_in_conversation` |
 | **M2Lingual** | Multilingual | - |
 | **SkillMix** | Instruction Tuning | `PrincetonPLI/Instruct-SkillMix-SDD` |
