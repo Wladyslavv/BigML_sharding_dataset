@@ -16,3 +16,4 @@ wheels/
 !/data/evaluation/mmeb_v2/download_data.sh
 tmp*
 .ipynb_checkpoints/
+*.pt
