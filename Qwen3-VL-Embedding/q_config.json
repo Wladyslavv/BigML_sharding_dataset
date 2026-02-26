@@ -1,0 +1,5 @@
+{
+    "quantization": "bitsandbytes",
+    "load_format": "bitsandbytes",
+    "enforce_eager": true
+}
