@@ -1,0 +1,16 @@
+numpy
+matplotlib
+torch==2.9.0
+pandas
+tiktoken
+transformers
+datasets
+accelerate
+wandb
+mixture_of_experts
+openai
+bitsandbytes
+lz4
+token_count
+scipy
+gdown

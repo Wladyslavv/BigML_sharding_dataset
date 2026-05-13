@@ -1,0 +1,59 @@
+name: MediQ-Llama-3.1-8B
+
+# Inner MCTS simulator — SCOPE's own human simulator (unchanged role, updated model)
+human_sim:
+  type: local
+  model_config:
+    pretrained_model_name_or_path: meta-llama/Llama-3.1-8B-Instruct
+    attn_implementation: "flash_attention_2"
+  generation_config:
+    max_new_tokens: 150
+    num_beams: 5
+    num_beam_groups: 5
+    num_return_sequences: 5
+    diversity_penalty: 1.0
+    do_sample: False
+    temperature: 1.0
+    top_p: 1.0
+    repetition_penalty: 1.0
+    trust_remote_code: True
+  sys_prompt: "Pretend you are a human conversing with a companion or friend. Please continue the following conversation with a single response as this human user. Feel free to ask questions back as well."
+
+# Outer evaluator — SCOPE's own human_eval (unchanged role, updated model)
+human_eval:
+  type: local
+  model_config:
+    pretrained_model_name_or_path: meta-llama/Llama-3.1-8B-Instruct
+    attn_implementation: "flash_attention_2"
+  generation_config:
+    max_new_tokens: 150
+    num_beams: 5
+    num_beam_groups: 5
+    num_return_sequences: 5
+    diversity_penalty: 1.0
+    do_sample: False
+    temperature: 1.0
+    top_p: 1.0
+    repetition_penalty: 1.0
+    trust_remote_code: True
+  sys_prompt: "Pretend you are a human conversing with a companion or friend. Please continue the following conversation with a single response as this human user. Feel free to ask questions back as well."
+
+# Expert LLM — generates candidate questions/answers for MCTS to evaluate
+llm_model:
+  type: local
+  model_config:
+    pretrained_model_name_or_path: meta-llama/Llama-3.1-8B-Instruct
+    device_map: 0
+    attn_implementation: "flash_attention_2"
+  generation_config:
+    max_new_tokens: 100
+    num_beams: 5
+    num_beam_groups: 5
+    num_return_sequences: 5
+    diversity_penalty: 1.0
+    do_sample: False
+    temperature: 1.0
+    top_p: 1.0
+    repetition_penalty: 1.0
+    trust_remote_code: True
+  sys_prompt: "You are a medical expert. Given a clinical case with a multiple-choice question, you must either: (1) Ask ONE specific follow-up question to gather information needed, OR (2) Provide your final answer in the format: FINAL ANSWER: [A/B/C/D]. Be brief and direct."

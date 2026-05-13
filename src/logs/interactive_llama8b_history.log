@@ -1,0 +1,154 @@
+[2026-04-10 16:37:05,909] [INFO] |||||||||||||||||||| PATIENT #0 | GT: C (Ceftriaxone) ||||||||||||||||||||
+[2026-04-10 16:37:05,909] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:37:29,962] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'D', 'confidence': 1.0, 'usage': {'input_tokens': 307, 'output_tokens': 7}}
+[2026-04-10 16:37:29,962] [INFO] |||||||||||||||||||| Interaction ended for patient #0 | Predicted: D | GT: C | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:37:29,963] [INFO] |||||||||||||||||||| PATIENT #1 | GT: A (Cyclic vomiting syndrome) ||||||||||||||||||||
+[2026-04-10 16:37:29,963] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:37:33,774] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'A', 'confidence': 1.0, 'usage': {'input_tokens': 306, 'output_tokens': 2}}
+[2026-04-10 16:37:33,774] [INFO] |||||||||||||||||||| Interaction ended for patient #1 | Predicted: A | GT: A | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:37:33,775] [INFO] |||||||||||||||||||| PATIENT #2 | GT: D (Trazodone) ||||||||||||||||||||
+[2026-04-10 16:37:33,775] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:37:57,019] [INFO] [Expert System]: {'type': 'question', 'question': 'Have you experienced any episodes of anxiety or depression in the past?', 'letter_choice': 'C', 'confidence': 0.0, 'usage': {'input_tokens': 550, 'output_tokens': 16}}
+[2026-04-10 16:38:34,310] [INFO] [Patient System]: The patient denies feeling anxious or having disturbing thoughts while in bed.
+[2026-04-10 16:38:34,311] [INFO] ==================== Turn 2 ====================
+[2026-04-10 16:39:05,362] [INFO] [Expert System]: {'type': 'question', 'question': 'Have you noticed any changes in your sleep patterns, such as waking up frequently during the night?', 'letter_choice': 'D', 'confidence': 0.0, 'usage': {'input_tokens': 610, 'output_tokens': 22}}
+[2026-04-10 16:39:58,588] [INFO] [Patient System]: 2. She denies feeling anxious or having disturbing thoughts while in bed.
+3. Even when she manages to fall asleep, she wakes up early in the morning and is unable to fall back asleep.
+[2026-04-10 16:39:58,588] [INFO] ==================== Turn 3 ====================
+[2026-04-10 16:40:45,010] [INFO] [Expert System]: {'type': 'question', 'question': 'Have you experienced any significant changes in your lifestyle, such as a change in work schedule, travel, or social stressors, over the past 6 weeks?', 'letter_choice': 'B', 'confidence': 0.0, 'usage': {'input_tokens': 740, 'output_tokens': 35}}
+[2026-04-10 16:42:28,740] [INFO] [Patient System]: 1. She has grown increasingly irritable and feels increasingly hopeless.
+2. Her concentration and interest at work have diminished.
+3. She has lost 4 kg (8.8 lb) in the last few weeks due to diminished appetite.
+4. She has started drinking a glass of wine every night instead of eating dinner.
+5. The patient has no significant past medical history and is not on any medications.
+[2026-04-10 16:42:28,740] [INFO] ==================== Turn 4 ====================
+[2026-04-10 16:42:33,256] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'B', 'confidence': 1.0, 'usage': {'input_tokens': 510, 'output_tokens': 2}}
+[2026-04-10 16:42:33,256] [INFO] |||||||||||||||||||| Interaction ended for patient #2 | Predicted: B | GT: D | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:42:33,256] [INFO] |||||||||||||||||||| PATIENT #3 | GT: B (Obtain a urine analysis and urine culture) ||||||||||||||||||||
+[2026-04-10 16:42:33,256] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:42:37,394] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'B', 'confidence': 1.0, 'usage': {'input_tokens': 318, 'output_tokens': 2}}
+[2026-04-10 16:42:37,394] [INFO] |||||||||||||||||||| Interaction ended for patient #3 | Predicted: B | GT: B | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:42:37,394] [INFO] |||||||||||||||||||| PATIENT #4 | GT: A (Hypoperfusion) ||||||||||||||||||||
+[2026-04-10 16:42:37,394] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:42:42,586] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'A', 'confidence': 1.0, 'usage': {'input_tokens': 286, 'output_tokens': 3}}
+[2026-04-10 16:42:42,586] [INFO] |||||||||||||||||||| Interaction ended for patient #4 | Predicted: A | GT: A | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:42:42,586] [INFO] |||||||||||||||||||| PATIENT #5 | GT: C (Iron deficiency) ||||||||||||||||||||
+[2026-04-10 16:42:42,587] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:42:46,583] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'C', 'confidence': 1.0, 'usage': {'input_tokens': 292, 'output_tokens': 2}}
+[2026-04-10 16:42:46,583] [INFO] |||||||||||||||||||| Interaction ended for patient #5 | Predicted: C | GT: C | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:42:46,583] [INFO] |||||||||||||||||||| PATIENT #6 | GT: D (Proteasomal degradation of ubiquitinated proteins) ||||||||||||||||||||
+[2026-04-10 16:42:46,583] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:42:51,069] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'D', 'confidence': 1.0, 'usage': {'input_tokens': 325, 'output_tokens': 2}}
+[2026-04-10 16:42:51,069] [INFO] |||||||||||||||||||| Interaction ended for patient #6 | Predicted: D | GT: D | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:42:51,069] [INFO] |||||||||||||||||||| PATIENT #7 | GT: C (Non-exertional heat stroke) ||||||||||||||||||||
+[2026-04-10 16:42:51,069] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:42:55,600] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'D', 'confidence': 1.0, 'usage': {'input_tokens': 291, 'output_tokens': 2}}
+[2026-04-10 16:42:55,600] [INFO] |||||||||||||||||||| Interaction ended for patient #7 | Predicted: D | GT: C | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:42:55,601] [INFO] |||||||||||||||||||| PATIENT #8 | GT: A (Alpha-ketoglutarate dehydrogenase) ||||||||||||||||||||
+[2026-04-10 16:42:55,601] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:43:13,530] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'A', 'confidence': 1.0, 'usage': {'input_tokens': 317, 'output_tokens': 13}}
+[2026-04-10 16:43:13,530] [INFO] |||||||||||||||||||| Interaction ended for patient #8 | Predicted: A | GT: A | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:43:13,531] [INFO] |||||||||||||||||||| PATIENT #9 | GT: A (Atenolol) ||||||||||||||||||||
+[2026-04-10 16:43:13,531] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:43:52,996] [INFO] [Expert System]: {'type': 'question', 'question': 'Have you experienced any symptoms such as shortness of breath, swelling in your legs, or chest pain during the past few months?', 'letter_choice': 'C', 'confidence': 0.0, 'usage': {'input_tokens': 542, 'output_tokens': 29}}
+[2026-04-10 16:44:32,695] [INFO] [Patient System]: 2. The patient was discharged from the hospital yesterday after management of a myocardial infarction.
+3. The patient sometimes experiences exertional angina.
+[2026-04-10 16:44:32,695] [INFO] ==================== Turn 2 ====================
+[2026-04-10 16:44:36,710] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'A', 'confidence': 1.0, 'usage': {'input_tokens': 352, 'output_tokens': 2}}
+[2026-04-10 16:44:36,711] [INFO] |||||||||||||||||||| Interaction ended for patient #9 | Predicted: A | GT: A | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:44:36,711] [INFO] |||||||||||||||||||| PATIENT #10 | GT: A (Decrease production of growth hormone) ||||||||||||||||||||
+[2026-04-10 16:44:36,711] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:44:40,894] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'D', 'confidence': 1.0, 'usage': {'input_tokens': 309, 'output_tokens': 2}}
+[2026-04-10 16:44:40,894] [INFO] |||||||||||||||||||| Interaction ended for patient #10 | Predicted: D | GT: A | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:44:40,894] [INFO] |||||||||||||||||||| PATIENT #11 | GT: C (2 years) ||||||||||||||||||||
+[2026-04-10 16:44:40,894] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:44:45,137] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'B', 'confidence': 1.0, 'usage': {'input_tokens': 344, 'output_tokens': 2}}
+[2026-04-10 16:44:45,137] [INFO] |||||||||||||||||||| Interaction ended for patient #11 | Predicted: B | GT: C | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:44:45,137] [INFO] |||||||||||||||||||| PATIENT #12 | GT: B (Ask closed-ended questions and use a chaperone for future visits) ||||||||||||||||||||
+[2026-04-10 16:44:45,137] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:07,194] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'B', 'confidence': 1.0, 'usage': {'input_tokens': 323, 'output_tokens': 17}}
+[2026-04-10 16:45:07,194] [INFO] |||||||||||||||||||| Interaction ended for patient #12 | Predicted: B | GT: B | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:45:07,195] [INFO] |||||||||||||||||||| PATIENT #13 | GT: A (E. coli infection; beta-glucoronidase release) ||||||||||||||||||||
+[2026-04-10 16:45:07,195] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:11,228] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'D', 'confidence': 1.0, 'usage': {'input_tokens': 320, 'output_tokens': 2}}
+[2026-04-10 16:45:11,228] [INFO] |||||||||||||||||||| Interaction ended for patient #13 | Predicted: D | GT: A | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:45:11,228] [INFO] |||||||||||||||||||| PATIENT #14 | GT: A (Monomorphic ventricular tachycardia) ||||||||||||||||||||
+[2026-04-10 16:45:11,228] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:15,165] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'A', 'confidence': 1.0, 'usage': {'input_tokens': 305, 'output_tokens': 2}}
+[2026-04-10 16:45:15,165] [INFO] |||||||||||||||||||| Interaction ended for patient #14 | Predicted: A | GT: A | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:45:15,165] [INFO] |||||||||||||||||||| PATIENT #15 | GT: D (Oppositional defiant disorder) ||||||||||||||||||||
+[2026-04-10 16:45:15,165] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:19,159] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'B', 'confidence': 1.0, 'usage': {'input_tokens': 303, 'output_tokens': 2}}
+[2026-04-10 16:45:19,160] [INFO] |||||||||||||||||||| Interaction ended for patient #15 | Predicted: B | GT: D | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:45:19,160] [INFO] |||||||||||||||||||| PATIENT #16 | GT: B (High central venous pressure (CPV)) ||||||||||||||||||||
+[2026-04-10 16:45:19,160] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:23,315] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'B', 'confidence': 1.0, 'usage': {'input_tokens': 322, 'output_tokens': 2}}
+[2026-04-10 16:45:23,315] [INFO] |||||||||||||||||||| Interaction ended for patient #16 | Predicted: B | GT: B | Correct: True ||||||||||||||||||||
+
+
+
+[2026-04-10 16:45:23,315] [INFO] |||||||||||||||||||| PATIENT #17 | GT: A (Gram-negative coccobacillus) ||||||||||||||||||||
+[2026-04-10 16:45:23,315] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:27,416] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'D', 'confidence': 1.0, 'usage': {'input_tokens': 318, 'output_tokens': 2}}
+[2026-04-10 16:45:27,417] [INFO] |||||||||||||||||||| Interaction ended for patient #17 | Predicted: D | GT: A | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:45:27,417] [INFO] |||||||||||||||||||| PATIENT #18 | GT: B (Erythema infectiosum) ||||||||||||||||||||
+[2026-04-10 16:45:27,417] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:39,748] [INFO] [Expert System]: {'type': 'choice', 'question': None, 'letter_choice': 'A', 'confidence': 1.0, 'usage': {'input_tokens': 304, 'output_tokens': 9}}
+[2026-04-10 16:45:39,748] [INFO] |||||||||||||||||||| Interaction ended for patient #18 | Predicted: A | GT: B | Correct: False ||||||||||||||||||||
+
+
+
+[2026-04-10 16:45:39,748] [INFO] |||||||||||||||||||| PATIENT #19 | GT: A (Modafinil) ||||||||||||||||||||
+[2026-04-10 16:45:39,748] [INFO] ==================== Turn 1 ====================
+[2026-04-10 16:45:57,392] [INFO] [Expert System]: {'type': 'question', 'question': 'Does the patient experience excessive daytime sleepiness?', 'letter_choice': 'C', 'confidence': 0.0, 'usage': {'input_tokens': 560, 'output_tokens': 12}}
