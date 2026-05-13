@@ -13,12 +13,12 @@ cd $SRC && CUDA_VISIBLE_DEVICES=0 $PYTHON mediQ_benchmark.py \
   --expert_model $MODEL \
   --patient_class FactSelectPatient \
   --patient_model $MODEL \
-  --use_vllm \
+  --overwrite \
   --data_dir $DATA \
   --dev_filename $FILE \
+  --max_examples 1 \
+  --max_tokens 2048 \
   --max_questions 10 \
   --rationale_generation \
-  --output_filename results/scale_rg_medgemma4b.jsonl \
-  --detail_log_filename logs/scale_rg_medgemma4b_detail.log \
-  --convo_log_filename logs/scale_rg_medgemma4b_convo.jsonl \
-  2>&1 | tee logs/scale_rg_medgemma4b.log
+  --abstain_threshold 4.0 \
+  --convo_log_filename /home/hyang/mediQ/logs/scale_rg_medgemma4b_convo.jsonl

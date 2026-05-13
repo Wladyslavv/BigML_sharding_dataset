@@ -237,6 +237,8 @@ class ScaleExpert(Expert):
                 "type": "choice",
                 "letter_choice": abstain_response_dict["letter_choice"],
                 "confidence": abstain_response_dict["confidence"],
+                "confidence_rationale": abstain_response_dict["confidence_rationale"],
+                "shadow_answer": abstain_response_dict["shadow_answer"],
                 "usage": abstain_response_dict["usage"]
             }
 
@@ -248,5 +250,7 @@ class ScaleExpert(Expert):
             "question": question_response_dict["atomic_question"],
             "letter_choice": abstain_response_dict["letter_choice"],
             "confidence": abstain_response_dict["confidence"],
+            "confidence_rationale": abstain_response_dict["confidence_rationale"],
+            "shadow_answer": abstain_response_dict["shadow_answer"],
             "usage": abstain_response_dict["usage"]
         }

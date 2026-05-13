@@ -245,6 +245,10 @@ def parse_atomic_question(response_text):
 def parse_choice(response_text, options_dict):
     if response_text.strip() in ["A", "B", "C", "D"]:
         return response_text.strip()
+    m = re.search(r'LETTER CHOICE[:\s]+([A-D])', response_text, re.IGNORECASE)
+    if m:
+        log_info(f"....Found LETTER CHOICE: {m.group(1)}")
+        return m.group(1)
     for response_line in response_text.split("\n"):
         for op_letter, op_text in options_dict.items():
             if op_text.lower() in response_line.lower():

@@ -78,7 +78,7 @@ class RandomPatient(Patient):
     def respond(self, question):
         # Randomly select a response mode
         if random.random() < 0.5 or len(self.context_list) == 0:
-            answer = "The patient cannot answer this question, please do not ask this question again."
+            answer = "This question is probably irrelevant to the case. Please ask something else instead."
         else:
             answer = random.choice(self.context_list)
         self.update_state(question, answer)
@@ -98,7 +98,7 @@ class DirectPatient(Patient):
 class InstructPatient(Patient):
     def respond(self, question):
         system_prompt = "You are a truthful assistant that understands the patient's information, and you are trying to answer questions from a medical doctor about the patient."
-        user_prompt = f"Below is a context paragraph describing the patient and their conditions:\n\"{self.context_para}\"\nQuestion from the doctor: \"{question}\"\nUse the context paragraph to answer the doctor's question. If the paragraph does not answer the question, simply say \"The patient cannot answer this question, please do not ask this question again.\" Answer only what the question asks for. Do not provide any analysis, inference, or implications. Respond with a straightforward answer to the question ONLY and NOTHING ELSE."
+        user_prompt = f"Below is a context paragraph describing the patient and their conditions:\n\"{self.context_para}\"\nQuestion from the doctor: \"{question}\"\nUse the context paragraph to answer the doctor's question. If the paragraph does not answer the question, simply say \"This question is probably irrelevant to the case. Please ask something else instead.\" Answer only what the question asks for. Do not provide any analysis, inference, or implications. Respond with a straightforward answer to the question ONLY and NOTHING ELSE."
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
         _log(f"[PATIENT PROMPT (InstructPatient)]: {messages}")
         response, log_probs, num_tokens = self.get_response(messages)
@@ -118,7 +118,7 @@ class FactSelectPatient(Patient):
             response_text = [s.strip() for s in response_text.splitlines()]
             self.facts = response_text
         facts_prompt = "\n".join(self.facts)
-        system_prompt = "You are a truthful medical assistant that understands the patient's information, and you are trying to answer questions from a medical doctor about the patient given a list of factual statements describing the patient. Please return the facts that answer the doctor's question verbatim without any additional information. If none of the facts answer the question, simply say \"The patient cannot answer this question, please do not ask this question again.\""
+        system_prompt = "You are a truthful medical assistant that understands the patient's information, and you are trying to answer questions from a medical doctor about the patient given a list of factual statements describing the patient. Please return the facts that answer the doctor's question verbatim without any additional information. If none of the facts answer the question, simply say \"This question is probably irrelevant to the case. Please ask something else instead.\""
         prompt = f"List of facts:\n{facts_prompt}\n\nQuestion from the doctor: \"{question}\"\n\nStatements that answer the question:"
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
         _log(f"[PATIENT PROMPT (FactSelectPatient/select)]: {messages}")

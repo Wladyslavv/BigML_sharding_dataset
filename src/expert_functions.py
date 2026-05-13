@@ -277,11 +277,11 @@ def scale_abstention_decision(patient_state, rationale_generation, inquiry, opti
         {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
         {"role": "user", "content": prompt_abstain}
     ]
-    response_text, conf_score, log_probs, num_tokens = expert_basics.expert_response_scale_score(messages, abstain_threshold=abstain_threshold, **kwargs)
+    confidence_rationale, conf_score, log_probs, num_tokens = expert_basics.expert_response_scale_score(messages, abstain_threshold=abstain_threshold, **kwargs)
     abstain_decision = conf_score < abstain_threshold
     log_info(f"[ABSTENTION PROMPT]: {messages}")
-    log_info(f"[ABSTENTION RESPONSE]: {response_text}\n")
-    messages.append({"role": "assistant", "content": response_text})
+    log_info(f"[ABSTENTION RESPONSE]: {confidence_rationale}\n")
+    messages.append({"role": "assistant", "content": confidence_rationale})
 
     # second, no matter what the model's abstention decision is, get an intermediate answer for evaluation and analysis
     prompt_answer = prompts.expert_system["curr_template"].format(patient_info, conv_log if conv_log != '' else 'None', inquiry, options_text, prompts.expert_system["answer"])
@@ -289,7 +289,7 @@ def scale_abstention_decision(patient_state, rationale_generation, inquiry, opti
         {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
         {"role": "user", "content": prompt_answer}
     ]
-    response_text, letter_choice, num_tokens_answer = expert_basics.expert_response_choice(messages_answer, options_dict, **kwargs)
+    shadow_answer, letter_choice, num_tokens_answer = expert_basics.expert_response_choice(messages_answer, options_dict, **kwargs)
     num_tokens["input_tokens"] += num_tokens_answer["input_tokens"]
     num_tokens["output_tokens"] += num_tokens_answer["output_tokens"]
 
@@ -297,6 +297,8 @@ def scale_abstention_decision(patient_state, rationale_generation, inquiry, opti
     return {
         "abstain": abstain_decision,
         "confidence": conf_score,
+        "confidence_rationale": confidence_rationale,
+        "shadow_answer": shadow_answer,
         "usage": num_tokens,
         "messages": messages,
         "letter_choice": letter_choice,

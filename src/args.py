@@ -16,6 +16,8 @@ def get_args():
     parser.add_argument('--dev_filename', type=str, required=True, help='Filename for development data.')
 
     parser.add_argument('--output_filename', type=str, default="results.jsonl")
+    parser.add_argument('--max_examples', type=int, default=-1, help='Max number of examples to run. -1 means all.')
+    parser.add_argument('--overwrite', action='store_true', help='Overwrite existing output file.')
 
     parser.add_argument("--max_questions", type=int, default=30)
 

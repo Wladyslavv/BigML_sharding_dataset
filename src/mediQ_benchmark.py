@@ -1,10 +1,21 @@
 import json
 import os
+import textwrap
 import time
 import logging
 from args import get_args
 from patient import Patient
 import importlib
+
+def _block(label, text, width=80, indent=4):
+    pad = " " * indent
+    if text is None:
+        return f"{pad}{label}: (none)\n"
+    text = str(text)
+    if "\n" not in text and len(text) <= width - indent - len(label) - 2:
+        return f"{pad}{label}: {text}\n"
+    wrapped = textwrap.indent(textwrap.fill(text.strip(), width=width - indent), pad + "  ")
+    return f"{pad}{label}:\n{wrapped}\n"
 
 def setup_logger(name, file):
     if not file: return None
@@ -29,6 +40,11 @@ def load_data(filename):
     return data
 
 def main():
+    if args.overwrite and os.path.exists(args.output_filename):
+        open(args.output_filename, 'w').close()
+    if args.overwrite and args.convo_log_filename and os.path.exists(args.convo_log_filename):
+        open(args.convo_log_filename, 'w').close()
+
     if os.path.exists(args.output_filename):
         with open(args.output_filename, "r") as f:
             lines = f.readlines()
@@ -48,6 +64,8 @@ def main():
     
     patient_data_path = os.path.join(args.data_dir, args.dev_filename)
     patient_data = load_data(patient_data_path)
+    if args.max_examples > 0:
+        patient_data = dict(list(patient_data.items())[:args.max_examples])
 
     num_processed = 0
     correct_history, timeout_history, turn_lengths = [], [], []
@@ -87,32 +105,42 @@ def main():
             # }
         }
 
-        os.makedirs(os.path.dirname(args.output_filename), exist_ok=True)
+        out_dir = os.path.dirname(args.output_filename)
+        if out_dir: os.makedirs(out_dir, exist_ok=True)
         with open(args.output_filename, 'a+') as f:
             f.write(json.dumps(output_dict) + '\n')
 
         if args.convo_log_filename:
-            convo_dict = {
-                "id": pid,
-                "clinical_question": sample_info["question"],
-                "options": sample_info["options"],
-                "initial_info": sample_info["initial_info"],
-                "conversation": [
-                    {"turn": i + 1, "doctor": q, "patient": a}
-                    for i, (q, a) in enumerate(zip(questions, answers))
-                ],
-                "predicted_answer": letter_choice,
-                "predicted_text": sample_info["options"].get(letter_choice, ""),
-                "true_answer": sample_info["correct_answer_idx"],
-                "true_text": sample_info["correct_answer"],
-                "correct": letter_choice == sample_info["correct_answer_idx"],
-                "num_turns": len(questions),
-            }
+            correct_str = "CORRECT" if letter_choice == sample_info["correct_answer_idx"] else "WRONG"
+            opts = "  ".join(f"{k}: {v}" for k, v in sample_info["options"].items())
+            lines = []
+            lines.append("=" * 80)
+            lines.append(f"Patient #{pid}  |  {correct_str}  |  Predicted: {letter_choice}  |  True: {sample_info['correct_answer_idx']} ({sample_info['correct_answer']})")
+            lines.append("=" * 80)
+            lines.append(_block("Initial", sample_info["initial_info"]))
+            lines.append(_block("Question", sample_info["question"]))
+            lines.append(f"    Options: {opts}\n")
+            for i, (q, a, meta) in enumerate(zip(questions, answers, temp_additional_info)):
+                lines.append(f"  --- Turn {i+1} " + "-" * 60)
+                lines.append(f"    Confidence: {meta.get('confidence')}")
+                lines.append(_block("Confidence Rationale", meta.get("confidence_rationale")))
+                lines.append(_block("Shadow Answer", meta.get("shadow_answer")))
+                lines.append(_block("Doctor Question", q))
+                lines.append(_block("Patient", a))
+            # final decision turn (always one more meta entry than questions)
+            if len(temp_additional_info) > len(questions):
+                meta = temp_additional_info[len(questions)]
+                lines.append(f"  --- Turn {len(questions)+1} (Final Decision) " + "-" * 45)
+                lines.append(f"    Confidence: {meta.get('confidence')}")
+                lines.append(_block("Confidence Rationale", meta.get("confidence_rationale")))
+                lines.append(_block("Shadow Answer", meta.get("shadow_answer")))
+                lines.append(f"    → Committed to answer: {letter_choice}")
+            lines.append("")
             convo_dir = os.path.dirname(args.convo_log_filename)
             if convo_dir:
                 os.makedirs(convo_dir, exist_ok=True)
             with open(args.convo_log_filename, 'a') as f:
-                f.write(json.dumps(convo_dict) + '\n')
+                f.write("\n".join(lines) + "\n")
 
         correct_history.append(letter_choice == sample["answer_idx"])
         timeout_history.append(len(temp_choice_list) > args.max_questions)
