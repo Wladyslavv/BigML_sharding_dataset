@@ -5,6 +5,7 @@ import time
 import logging
 from args import get_args
 from patient import Patient
+import expert_functions
 import importlib
 
 def _block(label, text, width=80, indent=4):
@@ -16,6 +17,35 @@ def _block(label, text, width=80, indent=4):
         return f"{pad}{label}: {text}\n"
     wrapped = textwrap.indent(textwrap.fill(text.strip(), width=width - indent), pad + "  ")
     return f"{pad}{label}:\n{wrapped}\n"
+
+
+def _block_lines(label, text, width=80, indent=4):
+    """Like _block but preserves newlines (wrap each physical line separately)."""
+    pad = " " * indent
+    inner_w = max(20, width - indent - 2)
+    if text is None:
+        return f"{pad}{label}: (none)\n"
+    out = [f"{pad}{label}:"]
+    for ln in str(text).splitlines():
+        s = ln.strip()
+        if not s:
+            out.append(pad + "  ")
+            continue
+        chunks = textwrap.wrap(s, width=inner_w) or [s]
+        for ch in chunks:
+            out.append(pad + "  " + ch)
+    return "\n".join(out) + "\n"
+
+
+def _format_full_context(context):
+    """Turn sample context (list or str) into a single string for logging."""
+    if context is None:
+        return None
+    if isinstance(context, list):
+        if not context:
+            return "(empty list)"
+        return "\n".join(f"[{i}] {item}" for i, item in enumerate(context, start=1))
+    return str(context).strip() or "(empty)"
 
 def setup_logger(name, file):
     if not file: return None
@@ -40,6 +70,10 @@ def load_data(filename):
     return data
 
 def main():
+    if args.option_mode != "yes-option":
+        base, ext = os.path.splitext(args.output_filename)
+        args.output_filename = f"{base}_{args.option_mode}{ext}"
+
     if args.overwrite and os.path.exists(args.output_filename):
         open(args.output_filename, 'w').close()
     if args.overwrite and args.convo_log_filename and os.path.exists(args.convo_log_filename):
@@ -50,7 +84,7 @@ def main():
             lines = f.readlines()
         output_data = [json.loads(line) for line in lines]
         if len(lines) == 0: processed_ids = []
-        else: processed_ids = {sample["id"]: {"correct": sample["interactive_system"]["letter_choice"] == sample["info"]["correct_answer_idx"],
+        else: processed_ids = {sample["id"]: {"correct": sample["interactive_system"]["correct"],
                                               "timeout": len(sample["interactive_system"]["intermediate_choices"]) > args.max_questions,
                                               "turns": sample["interactive_system"]["num_questions"]}
                                 for sample in output_data}
@@ -80,13 +114,36 @@ def main():
 
         log_info(f"|||||||||||||||||||| PATIENT #{pid} | GT: {sample['answer_idx']} ({sample['answer']}) ||||||||||||||||||||")
         letter_choice, questions, answers, temp_choice_list, temp_additional_info, sample_info = run_patient_interaction(expert_class, patient_class, sample)
-        log_info(f"|||||||||||||||||||| Interaction ended for patient #{pid} | Predicted: {letter_choice} | GT: {sample['answer_idx']} | Correct: {letter_choice == sample['answer_idx']} ||||||||||||||||||||\n\n\n")
+
+        judgment, judgment_rationale = None, None
+        if args.option_mode == "no-option":
+            final_meta = temp_additional_info[-1] if temp_additional_info else {}
+            boxed_answer = final_meta.get("boxed_answer")
+            if boxed_answer:
+                judge_kwargs = dict(model_name=args.patient_model, use_vllm=args.use_vllm,
+                                    use_api=args.use_api, temperature=args.temperature,
+                                    max_tokens=args.max_tokens, top_p=args.top_p,
+                                    tensor_parallel_size=args.tensor_parallel_size,
+                                    batch_size=args.batch_size,
+                                    gpu_memory_utilization=getattr(args, "gpu_memory_utilization", None),
+                                    vllm_max_model_len=getattr(args, "vllm_max_model_len", None),
+                                    vllm_max_num_seqs=getattr(args, "vllm_max_num_seqs", None),
+                                    vllm_enforce_eager=getattr(args, "vllm_enforce_eager", False))
+                judgment, judgment_rationale, _ = expert_functions.judge_answer(
+                    boxed_answer, sample_info["correct_answer"], sample_info["question"], **judge_kwargs)
+            is_correct = judgment == "YES"
+        else:
+            is_correct = letter_choice == sample["answer_idx"]
+
+        log_info(f"|||||||||||||||||||| Interaction ended for patient #{pid} | Predicted: {letter_choice} | GT: {sample['answer_idx']} | Correct: {is_correct} ||||||||||||||||||||\n\n\n")
 
         output_dict = {
             "id": pid,
             "interactive_system": {
-                "correct": letter_choice == sample["answer_idx"],
+                "correct": is_correct,
                 "letter_choice": letter_choice,
+                "judgment": judgment,
+                "judgment_rationale": judgment_rationale,
                 "questions": questions,
                 "answers": answers,
                 "num_questions": len(questions),
@@ -111,7 +168,7 @@ def main():
             f.write(json.dumps(output_dict) + '\n')
 
         if args.convo_log_filename:
-            correct_str = "CORRECT" if letter_choice == sample_info["correct_answer_idx"] else "WRONG"
+            correct_str = "CORRECT" if is_correct else "WRONG"
             opts = "  ".join(f"{k}: {v}" for k, v in sample_info["options"].items())
             lines = []
             lines.append("=" * 80)
@@ -119,12 +176,17 @@ def main():
             lines.append("=" * 80)
             lines.append(_block("Initial", sample_info["initial_info"]))
             lines.append(_block("Question", sample_info["question"]))
-            lines.append(f"    Options: {opts}\n")
+            if args.option_mode == "yes-option":
+                lines.append(f"    Options: {opts}\n")
             for i, (q, a, meta) in enumerate(zip(questions, answers, temp_additional_info)):
                 lines.append(f"  --- Turn {i+1} " + "-" * 60)
                 lines.append(f"    Confidence: {meta.get('confidence')}")
                 lines.append(_block("Confidence Rationale", meta.get("confidence_rationale")))
                 lines.append(_block("Shadow Answer", meta.get("shadow_answer")))
+                if args.option_mode != "yes-option":
+                    lines.append(_block("Boxed Answer", meta.get("boxed_answer")))
+                if meta.get("question_rationale"):
+                    lines.append(_block("Question Rationale", meta.get("question_rationale")))
                 lines.append(_block("Doctor Question", q))
                 lines.append(_block("Patient", a))
             # final decision turn (always one more meta entry than questions)
@@ -134,7 +196,14 @@ def main():
                 lines.append(f"    Confidence: {meta.get('confidence')}")
                 lines.append(_block("Confidence Rationale", meta.get("confidence_rationale")))
                 lines.append(_block("Shadow Answer", meta.get("shadow_answer")))
-                lines.append(f"    → Committed to answer: {letter_choice}")
+                if args.option_mode == "no-option":
+                    lines.append(_block("Boxed Answer", meta.get("boxed_answer")))
+                    lines.append(f"    → Judgment: {judgment}  |  {judgment_rationale}")
+                elif args.option_mode == "option-in-the-end":
+                    lines.append(_block("Boxed Answer", meta.get("boxed_answer")))
+                    lines.append(f"    → Committed to answer: {letter_choice}")
+                else:
+                    lines.append(f"    → Committed to answer: {letter_choice}")
             lines.append("")
             convo_dir = os.path.dirname(args.convo_log_filename)
             if convo_dir:
@@ -142,7 +211,44 @@ def main():
             with open(args.convo_log_filename, 'a') as f:
                 f.write("\n".join(lines) + "\n")
 
-        correct_history.append(letter_choice == sample["answer_idx"])
+        if args.doctor_log_filename:
+            final_meta = temp_additional_info[-1] if temp_additional_info else {}
+            correct_str = "CORRECT" if is_correct else "WRONG"
+            final_answer = letter_choice if args.option_mode != "no-option" else final_meta.get("boxed_answer")
+            opts = "  ".join(f"{k}: {v}" for k, v in sample_info["options"].items())
+            doc_lines = []
+            doc_lines.append("=" * 80)
+            doc_lines.append(f"Patient #{pid}  |  {correct_str}  |  Predicted: {final_answer}  |  True: {sample_info['correct_answer_idx']} ({sample_info['correct_answer']})")
+            doc_lines.append("=" * 80)
+            doc_lines.append(_block("Initial", sample_info["initial_info"]))
+            doc_lines.append(_block("Question", sample_info["question"]))
+            doc_lines.append(
+                _block_lines(
+                    "Full context (all segments)",
+                    _format_full_context(sample_info.get("context")),
+                )
+            )
+            if args.option_mode == "yes-option":
+                doc_lines.append(f"    Options: {opts}\n")
+            for i, (q, a) in enumerate(zip(questions, answers)):
+                doc_lines.append(f"  --- Turn {i+1} " + "-" * 60)
+                if args.rationale_generation:
+                    turn_meta = temp_additional_info[i] if i < len(temp_additional_info) else {}
+                    if turn_meta.get("question_rationale"):
+                        doc_lines.append(_block("Question Rationale", turn_meta["question_rationale"]))
+                doc_lines.append(_block("Doctor", q))
+                doc_lines.append(_block("Patient", a))
+            doc_lines.append(f"  → Final Answer: {final_answer}")
+            if judgment is not None:
+                doc_lines.append(f"  → Judgment: {judgment}  |  {judgment_rationale}")
+            doc_lines.append("")
+            doctor_dir = os.path.dirname(args.doctor_log_filename)
+            if doctor_dir:
+                os.makedirs(doctor_dir, exist_ok=True)
+            with open(args.doctor_log_filename, 'a') as f:
+                f.write("\n".join(doc_lines) + "\n")
+
+        correct_history.append(is_correct)
         timeout_history.append(len(temp_choice_list) > args.max_questions)
         turn_lengths.append(len(temp_choice_list))
         num_processed += 1

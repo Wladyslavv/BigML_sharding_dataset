@@ -23,12 +23,47 @@ expert_system = {
         "YOUR TASK: {}"
     ),
 
+    "curr_template_no_options": (
+        "A patient comes into the clinic presenting with a symptom as described in the "
+        "conversation log below:\n    \n"
+        "PATIENT INFORMATION: {}\n"
+        "CONVERSATION LOG:\n{}\n"
+        "QUESTION: {}\n"
+        "YOUR TASK: {}"
+    ),
+
     # ── Final answer task ─────────────────────────────────────────────────────
     "answer": (
         "Assume that you already have enough information from the above question-answer "
         "pairs to answer the patient inquiry, use the above information to produce a "
         "factual conclusion. Respond with the correct letter choice (A, B, C, or D) and "
         "NOTHING ELSE.\nLETTER CHOICE: "
+    ),
+
+    "answer_boxed": (
+        "Assume that you already have enough information from the above question-answer "
+        "pairs to answer the patient inquiry, use the above information to produce a "
+        "factual conclusion. Be concise — your answer should be a short phrase (a "
+        "diagnosis, medication name, finding, etc.), not a sentence.\n"
+        "OUTPUT FORMAT — exactly one line:\n"
+        "    \\box{your answer}\n"
+        "Do NOT use markdown code fences (```), JSON, lists, or any other formatting. "
+        "Do NOT wrap the answer in quotes. Do NOT add any text before or after the "
+        "\\box{...}. Just the \\box{...} line and nothing else.\n"
+        "ANSWER: "
+    ),
+
+    # ── Judge ─────────────────────────────────────────────────────────────────
+    "judge": (
+        "The clinical question is: {}\n"
+        "The correct answer is: {}\n"
+        "The doctor's free-text answer is: {}\n"
+        "Is the doctor's answer correct? Consider whether the meaning matches the "
+        "correct answer, even if the wording differs. "
+        "Answer in the following format:\n"
+        "JUDGMENT: YES or NO\n"
+        "REASON: one sentence explaining why.\n"
+        "JUDGMENT: "
     ),
 
     # ── Follow-up question generator ─────────────────────────────────────────
@@ -47,6 +82,27 @@ expert_system = {
         "log. Answer in the following format:\n"
         "ATOMIC QUESTION: the atomic question and NOTHING ELSE.\n"
         "ATOMIC QUESTION: "
+    ),
+
+    # Same as atomic_question_improved, but the model must first output a one-sentence
+    # rationale explaining why this is the most useful next question. The rationale is
+    # logged for analysis; only the parsed question is forwarded to the patient model.
+    "atomic_question_improved_RG": (
+        "If there are missing features that prevent you from picking a confident and "
+        "factual answer to the inquiry, consider which features are not yet asked about "
+        "in the conversation log; then, consider which missing feature is the most "
+        "important to ask the patient in order to provide the most helpful information "
+        "toward a correct medical decision. You can ask about any relevant information "
+        "about the patient's case, such as family history, tests and exams results, "
+        "treatments already done, etc. Consider what are the common questions asked in "
+        "the specific subject relating to the patient's known symptoms, and what the "
+        "best and most intuitive doctor would ask. Ask ONE SPECIFIC ATOMIC QUESTION to "
+        "address this feature. The question should be bite-sized, and NOT ask for too "
+        "much at once. Make sure to NOT repeat any questions from the above conversation "
+        "log. Answer strictly in the following two-line format:\n"
+        "REASON: a one-sentence explanation of which missing feature you are targeting "
+        "and why this question is the most useful one to ask right now.\n"
+        "ATOMIC QUESTION: the atomic question and NOTHING ELSE."
     ),
 
     # ── Abstention strategies ─────────────────────────────────────────────────

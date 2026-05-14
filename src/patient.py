@@ -1,9 +1,54 @@
 import random
+import re
 import logging
 from helper import get_response
 
 def _log(message):
     logging.getLogger("detail_logger").info(message)
+
+# FactSelectPatient — fixed reply when no fact answers the doctor's question.
+FACTSELECT_CANNOT_ANSWER = (
+    "I cannot answer this question. Please do not ask it again; ask something else instead."
+)
+
+
+def _parse_fact_index_line(raw: str, n_facts: int):
+    """Parse LLM output that should only list fact indices or NONE.
+
+    Returns:
+        []  — no applicable facts (patient should use FACTSELECT_CANNOT_ANSWER)
+        list of int — 1-based indices into self.facts (deduped, in order)
+        None — unparseable / no valid in-range indices (treat as cannot answer)
+    """
+    if n_facts <= 0:
+        return []
+    t = (raw or "").strip()
+    t = re.sub(r"<[^>]*>", "", t)  # drop stray special tokens
+    if not t:
+        return None
+    first = t.splitlines()[0].strip()
+    # Strip common label noise the model may prepend
+    first = re.sub(
+        r"^\s*(?:\*\*)?\s*(?:mode\s*\(?\s*[ab]\s*\)?|output|answer|indices?)\s*[:\-]?\s*",
+        "",
+        first,
+        flags=re.IGNORECASE,
+    ).strip()
+    low = first.lower()
+    if low in ("none", "n/a", "na", "null", "0", "-", "nil"):
+        return []
+    nums = [int(x) for x in re.findall(r"\b(\d+)\b", first)]
+    nums = [i for i in nums if 1 <= i <= n_facts]
+    seen = set()
+    ordered = []
+    for i in nums:
+        if i not in seen:
+            seen.add(i)
+            ordered.append(i)
+    if not ordered:
+        return None
+    return ordered
+
 
 class Patient:
     def __init__(self, args, sample):
@@ -35,6 +80,10 @@ class Patient:
         self.use_api = args.use_api  # Use an API to generate responses
         self.tensor_parallel_size = args.tensor_parallel_size
         self.batch_size = args.batch_size
+        self.gpu_memory_utilization = getattr(args, "gpu_memory_utilization", None)
+        self.vllm_max_model_len = getattr(args, "vllm_max_model_len", None)
+        self.vllm_max_num_seqs = getattr(args, "vllm_max_num_seqs", None)
+        self.vllm_enforce_eager = getattr(args, "vllm_enforce_eager", False)
 
     def update_state(self, question, answer):
         # Update the internal history with the new question and the corresponding answer
@@ -57,8 +106,19 @@ class Patient:
     
     def get_response(self, messages, max_length=None):
         if max_length is None: max_length = self.max_length
-        return get_response(messages, self.model_name, use_vllm=self.use_vllm, use_api=self.use_api, max_length=max_length,
-                            tensor_parallel_size=self.tensor_parallel_size, batch_size=self.batch_size)
+        return get_response(
+            messages,
+            self.model_name,
+            use_vllm=self.use_vllm,
+            use_api=self.use_api,
+            max_length=max_length,
+            tensor_parallel_size=self.tensor_parallel_size,
+            batch_size=self.batch_size,
+            gpu_memory_utilization=self.gpu_memory_utilization,
+            vllm_max_model_len=self.vllm_max_model_len,
+            vllm_max_num_seqs=self.vllm_max_num_seqs,
+            vllm_enforce_eager=self.vllm_enforce_eager,
+        )
     
     def respond(self, question):
         raise NotImplementedError
@@ -115,14 +175,48 @@ class FactSelectPatient(Patient):
             _log(f"[PATIENT PROMPT (FactSelectPatient/decompose)]: {messages}")
             response_text, log_probs, num_tokens = self.get_response(messages, max_length=1000)
             _log(f"[PATIENT RESPONSE (FactSelectPatient/decompose)]: {response_text}")
-            response_text = [s.strip() for s in response_text.splitlines()]
+            response_text = [s.strip() for s in response_text.splitlines() if s.strip()]
             self.facts = response_text
-        facts_prompt = "\n".join(self.facts)
-        system_prompt = "You are a truthful medical assistant that understands the patient's information, and you are trying to answer questions from a medical doctor about the patient given a list of factual statements describing the patient. Please return the facts that answer the doctor's question verbatim without any additional information. If none of the facts answer the question, simply say \"This question is probably irrelevant to the case. Please ask something else instead.\""
-        prompt = f"List of facts:\n{facts_prompt}\n\nQuestion from the doctor: \"{question}\"\n\nStatements that answer the question:"
-        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
-        _log(f"[PATIENT PROMPT (FactSelectPatient/select)]: {messages}")
-        response, log_probs, num_tokens = self.get_response(messages)
-        _log(f"[PATIENT RESPONSE (FactSelectPatient/select)]: {response}")
-        self.update_state(question, response)
-        return response
+
+        n = len(self.facts)
+        # Renumber 1..n for the classifier (display only); answers use original fact lines.
+        display_lines = []
+        for i, line in enumerate(self.facts, start=1):
+            body = re.sub(r"^\s*\d+\.\s*", "", (line or "").strip()).strip()
+            display_lines.append(f"{i}. {body}")
+        facts_prompt = "\n".join(display_lines)
+
+        system_prompt = (
+            "You are a classifier. You will see a numbered list of atomic patient facts "
+            f"(lines 1–{n}) and one doctor question.\n\n"
+            "Your task: decide which fact line numbers (if any) are needed to answer that "
+            "question. Do NOT copy or paraphrase any fact text. Do NOT explain. Output "
+            "exactly one of the following on a single line:\n"
+            "  • NONE — if no fact helps answer the question\n"
+            "  • One or more integers separated by commas (e.g. 3 or 3,7,12) — the 1-based "
+            "line numbers of all relevant facts, in ascending order, each between 1 and "
+            f"{n}, no duplicates.\n\n"
+            "Do not output words like MODE, bullets, or JSON. Only NONE or a comma-separated list of integers."
+        )
+        user_prompt = (
+            f"FACTS:\n{facts_prompt}\n\n"
+            f'Doctor question: "{question}"\n\n'
+            "Your line (NONE or integers only):"
+        )
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+        _log(f"[PATIENT PROMPT (FactSelectPatient/select-indices)]: {messages}")
+        raw_indices, log_probs, num_tokens = self.get_response(messages)
+        _log(f"[PATIENT RESPONSE (FactSelectPatient/select-indices, raw)]: {raw_indices}")
+
+        parsed = _parse_fact_index_line(raw_indices, n)
+        if parsed is None:
+            answer = FACTSELECT_CANNOT_ANSWER
+        elif len(parsed) == 0:
+            answer = FACTSELECT_CANNOT_ANSWER
+        else:
+            parsed = sorted(parsed)
+            answer = "\n".join(self.facts[i - 1] for i in parsed)
+
+        _log(f"[PATIENT RESPONSE (FactSelectPatient/assembled)]: {answer}")
+        self.update_state(question, answer)
+        return answer

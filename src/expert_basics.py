@@ -225,6 +225,31 @@ def expert_response_question(messages, **kwargs):
 
 
 
+def expert_response_boxed_answer(messages, **kwargs):
+    log_info(f"++++++++++++++++++++ Start of Boxed Answer [expert_basics.py:expert_response_boxed_answer()] ++++++++++++++++++++")
+    log_info(f"[<BOXED ANSWER PROMPT>] (messages[-1]):\n{messages[-1]['content']}")
+    response_text, log_probs, num_tokens = get_response(messages, **kwargs)
+    if not response_text:
+        log_info("[<BOXED ANSWER LM RES>]: No response.")
+        return "No response.", None, num_tokens
+    log_info("[<BOXED ANSWER LM RES>]: " + response_text)
+    boxed = parse_boxed_answer(response_text)
+    log_info("[<BOXED ANSWER PARSED>]: " + (boxed or "FAILED TO PARSE."))
+    return response_text, boxed, num_tokens
+
+
+def expert_response_judge(messages, **kwargs):
+    log_info(f"++++++++++++++++++++ Start of Judge [expert_basics.py:expert_response_judge()] ++++++++++++++++++++")
+    log_info(f"[<JUDGE PROMPT>] (messages[-1]):\n{messages[-1]['content']}")
+    response_text, log_probs, num_tokens = get_response(messages, **kwargs)
+    if not response_text:
+        return "No response.", "NO", num_tokens
+    log_info("[<JUDGE LM RES>]: " + response_text)
+    judgment = parse_judgment(response_text)
+    log_info("[<JUDGE PARSED>]: " + judgment)
+    return response_text, judgment, num_tokens
+
+
 ############################
 # Helper Functions for Parsing Responses
 ############################
@@ -312,3 +337,46 @@ def parse_likert_scale(response_text):
         conf_score = 0
         log_info("can't parse likert confidence score: {}".format(response_text), type="error")
     return conf_score
+
+def parse_boxed_answer(response_text):
+    if not response_text:
+        return None
+    # 1) Preferred: \box{...} or \boxed{...} (LaTeX-style)
+    m = re.search(r'\\+boxe?d?\{(.+?)\}', response_text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    # 2) JSON-style fallback: "answer": "..."  (MedGemma sometimes emits a fenced JSON block)
+    m = re.search(r'"answer"\s*:\s*"([^"\n]+)"', response_text)
+    if m:
+        return m.group(1).strip()
+    # 3) Labeled line: ANSWER: / Final Answer: / Conclusion:
+    m = re.search(r'^\s*(?:answer|final answer|conclusion)\s*[:\-]\s*(.+?)\s*$',
+                  response_text, re.IGNORECASE | re.MULTILINE)
+    if m:
+        return m.group(1).strip().strip('`*"\'')
+    # 4) Last resort: last non-empty, non-code-fence, non-bracket line
+    for line in reversed(response_text.splitlines()):
+        clean = line.strip().strip('`*"\'')
+        if clean and not clean.startswith('```') and clean not in ('[', ']', '{', '}'):
+            log_info("parse_boxed_answer falling back to last line: {}".format(clean), type="error")
+            return clean
+    log_info("can't parse boxed answer, returning full text: {}".format(response_text), type="error")
+    return response_text.strip()
+
+def parse_judgment(response_text):
+    # Scan lines for an explicit JUDGMENT: YES/NO marker or a bare YES/NO token.
+    # Use word-boundary matching so "no" inside "gonorrhoeae" or "Neisseria" doesn't fire.
+    for line in response_text.splitlines():
+        # strip any stray tag tokens (e.g. <unused95>) that vLLM may prepend
+        clean = re.sub(r'<[^>]*>', '', line).strip()
+        if not clean:
+            continue
+        clean_lower = clean.lower()
+        has_judgment_key = "judgment" in clean_lower
+        is_bare_token = clean.upper() in ("YES", "NO")
+        if has_judgment_key or is_bare_token:
+            if re.search(r'\byes\b', clean_lower):
+                return "YES"
+            if re.search(r'\bno\b', clean_lower):
+                return "NO"
+    return "NO"

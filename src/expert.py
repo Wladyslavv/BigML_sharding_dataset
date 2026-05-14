@@ -23,7 +23,9 @@ class Expert:
             "options_dict": self.options,
             "messages": prev_messages,
             "independent_modules": self.args.independent_modules,
-            "model_name": self.args.expert_model_question_generator,
+            "option_mode": self.args.option_mode,
+            "rationale_generation": self.args.rationale_generation,
+            "model_name": self.args.expert_model_question_generator or self.args.expert_model,
             "use_vllm": self.args.use_vllm,
             "use_api": self.args.use_api,
             "temperature": self.args.temperature,
@@ -33,6 +35,10 @@ class Expert:
             "api_account": self.args.api_account,
             "tensor_parallel_size": self.args.tensor_parallel_size,
             "batch_size": self.args.batch_size,
+            "gpu_memory_utilization": getattr(self.args, "gpu_memory_utilization", None),
+            "vllm_max_model_len": getattr(self.args, "vllm_max_model_len", None),
+            "vllm_max_num_seqs": getattr(self.args, "vllm_max_num_seqs", None),
+            "vllm_enforce_eager": getattr(self.args, "vllm_enforce_eager", False),
         }
         return expert_functions.question_generation(**kwargs)
 
@@ -44,6 +50,7 @@ class Expert:
             "inquiry": self.inquiry,
             "options_dict": self.options,
             "abstain_threshold": self.args.abstain_threshold,
+            "option_mode": self.args.option_mode,
             "self_consistency": self.args.self_consistency,
             "model_name": self.args.expert_model,
             "use_vllm": self.args.use_vllm,
@@ -55,8 +62,30 @@ class Expert:
             "api_account": self.args.api_account,
             "tensor_parallel_size": self.args.tensor_parallel_size,
             "batch_size": self.args.batch_size,
+            "gpu_memory_utilization": getattr(self.args, "gpu_memory_utilization", None),
+            "vllm_max_model_len": getattr(self.args, "vllm_max_model_len", None),
+            "vllm_max_num_seqs": getattr(self.args, "vllm_max_num_seqs", None),
+            "vllm_enforce_eager": getattr(self.args, "vllm_enforce_eager", False),
         }
         return kwargs
+
+    def get_inference_kwargs(self):
+        return {
+            "model_name": self.args.expert_model,
+            "use_vllm": self.args.use_vllm,
+            "use_api": self.args.use_api,
+            "temperature": self.args.temperature,
+            "max_tokens": self.args.max_tokens,
+            "top_p": self.args.top_p,
+            "top_logprobs": self.args.top_logprobs,
+            "api_account": self.args.api_account,
+            "tensor_parallel_size": self.args.tensor_parallel_size,
+            "batch_size": self.args.batch_size,
+            "gpu_memory_utilization": getattr(self.args, "gpu_memory_utilization", None),
+            "vllm_max_model_len": getattr(self.args, "vllm_max_model_len", None),
+            "vllm_max_num_seqs": getattr(self.args, "vllm_max_num_seqs", None),
+            "vllm_enforce_eager": getattr(self.args, "vllm_enforce_eager", False),
+        }
 
 
 class RandomExpert(Expert):
@@ -229,13 +258,20 @@ class HumanExpert(Expert):
 
 class ScaleExpert(Expert):
     def respond(self, patient_state):
-        # Decision-making based on the initial information, history of interactions, current inquiry, and options
         kwargs = self.get_abstain_kwargs(patient_state)
         abstain_response_dict = expert_functions.scale_abstention_decision(**kwargs)
-        if abstain_response_dict["abstain"] == False:
+
+        if not abstain_response_dict["abstain"]:
+            if self.args.option_mode == "option-in-the-end":
+                letter_choice, num_tokens_final = expert_functions.final_choice_with_options(
+                    patient_state, self.inquiry, self.options, **self.get_inference_kwargs())
+                abstain_response_dict["letter_choice"] = letter_choice
+                abstain_response_dict["usage"]["input_tokens"] += num_tokens_final["input_tokens"]
+                abstain_response_dict["usage"]["output_tokens"] += num_tokens_final["output_tokens"]
             return {
                 "type": "choice",
                 "letter_choice": abstain_response_dict["letter_choice"],
+                "boxed_answer": abstain_response_dict["boxed_answer"],
                 "confidence": abstain_response_dict["confidence"],
                 "confidence_rationale": abstain_response_dict["confidence_rationale"],
                 "shadow_answer": abstain_response_dict["shadow_answer"],
@@ -248,7 +284,9 @@ class ScaleExpert(Expert):
         return {
             "type": "question",
             "question": question_response_dict["atomic_question"],
+            "question_rationale": question_response_dict.get("question_rationale"),
             "letter_choice": abstain_response_dict["letter_choice"],
+            "boxed_answer": abstain_response_dict["boxed_answer"],
             "confidence": abstain_response_dict["confidence"],
             "confidence_rationale": abstain_response_dict["confidence_rationale"],
             "shadow_answer": abstain_response_dict["shadow_answer"],

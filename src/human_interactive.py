@@ -47,6 +47,29 @@ def get_args():
     p.add_argument("--top_logprobs", type=int, default=0)
     p.add_argument("--tensor_parallel_size", type=int, default=1)
     p.add_argument("--batch_size", type=int, default=256)
+    p.add_argument(
+        "--gpu_memory_utilization",
+        type=float,
+        default=None,
+        help="vLLM GPU memory fraction (0–1). Lower when sharing the GPU. Env MEDIQ_VLLM_GPU_MEMORY_UTILIZATION if unset.",
+    )
+    p.add_argument(
+        "--vllm_max_model_len",
+        type=int,
+        default=8192,
+        help="vLLM max_model_len (KV). Default 8192 avoids 128k-context OOM on one GPU.",
+    )
+    p.add_argument(
+        "--vllm_max_num_seqs",
+        type=int,
+        default=None,
+        help="vLLM max_num_seqs; default uses --batch_size.",
+    )
+    p.add_argument(
+        "--vllm_enforce_eager",
+        action="store_true",
+        help="vLLM enforce_eager (lower peak VRAM, slower).",
+    )
     p.add_argument("--api_account", type=str, default="mediQ")
     return p.parse_args()
 
@@ -175,6 +198,10 @@ def main():
         "api_account":         args.api_account,
         "tensor_parallel_size": args.tensor_parallel_size,
         "batch_size":          args.batch_size,
+        "gpu_memory_utilization": args.gpu_memory_utilization,
+        "vllm_max_model_len":     args.vllm_max_model_len,
+        "vllm_max_num_seqs":      args.vllm_max_num_seqs,
+        "vllm_enforce_eager":     args.vllm_enforce_eager,
     }
 
     print(SEP)

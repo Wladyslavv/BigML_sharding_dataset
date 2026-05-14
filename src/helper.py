@@ -1,7 +1,12 @@
+import os
 import re
 import torch
 import logging
 from keys import mykey
+
+# vLLM tensor-parallel workers default to fork(), which breaks CUDA in child processes.
+# Spawn is safe; set before any `import vllm` (see vLLM troubleshooting: multiprocessing).
+os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
 
 # A dictionary to cache models and tokenizers to avoid reloading
 
@@ -15,6 +20,35 @@ def log_info(message, logger_name="message_logger", print_to_std=False, mode="in
         if mode == "warning": logger.warning(message)
         else: logger.info(message)
     if print_to_std: print(message + "\n")
+
+
+def _strip_thinking(text: str) -> str:
+    """Remove MedGemma-style thinking envelopes like `<unused94>...thought...<unused95>ANSWER`.
+    Applied to every LLM response so downstream parsers and convo logs only see the final answer.
+    """
+    if not text:
+        return text
+    stripped = re.sub(r'<[^>]+>.*?<[^>]+>', '', text, flags=re.DOTALL).strip()
+    if not stripped:
+        # thinking block was cut off mid-stream (no closing tag) → keep text after the last '>'
+        parts = re.split(r'>[^>]*$', text)
+        stripped = parts[-1].strip() if len(parts) > 1 else text.strip()
+    return stripped
+
+
+def _auto_vllm_gpu_memory_utilization() -> float:
+    """vLLM defaults to 0.9 × total VRAM, which fails if much VRAM is already in use (same
+    process or others). cuda:0 here is the first *visible* device after CUDA_VISIBLE_DEVICES.
+    """
+    if not torch.cuda.is_available():
+        return 0.9
+    free_b, total_b = torch.cuda.mem_get_info(0)
+    if total_b <= 0:
+        return 0.9
+    # Stay slightly under free/total so vLLM's startup check passes.
+    frac = (free_b / float(total_b)) * 0.92
+    return max(0.05, min(0.9, frac))
+
 
 class ModelCache:
     def __init__(self, model_name, use_vllm=False, use_api=None, **kwargs):
@@ -38,8 +72,52 @@ class ModelCache:
                 from vllm import LLM
                 enable_prefix_caching = self.args.get("enable_prefix_caching", False)
                 tensor_parallel_size = self.args.get("tensor_parallel_size", 1)
-                max_num_seqs = self.args.get("batch_size", 256)
-                self.model = LLM(model=self.model_name, enable_prefix_caching=enable_prefix_caching, tensor_parallel_size=tensor_parallel_size, max_num_seqs=max_num_seqs)
+                max_num_seqs = int(self.args.get("vllm_max_num_seqs") or self.args.get("batch_size", 256))
+                cap_seq = os.environ.get("MEDIQ_VLLM_MAX_NUM_SEQS", "").strip()
+                if cap_seq:
+                    max_num_seqs = min(max_num_seqs, int(cap_seq))
+                gpu_mem = self.args.get("gpu_memory_utilization")
+                _auto_gpu = False
+                if gpu_mem is None:
+                    env_g = os.environ.get("MEDIQ_VLLM_GPU_MEMORY_UTILIZATION", "").strip()
+                    if env_g:
+                        gpu_mem = float(env_g)
+                if gpu_mem is None:
+                    gpu_mem = _auto_vllm_gpu_memory_utilization()
+                    _auto_gpu = True
+                # KV cache scales with max_model_len; models like Llama-3.1 default to 128k and OOM on one GPU.
+                max_model_len = self.args.get("vllm_max_model_len")
+                if max_model_len is None:
+                    env_m = os.environ.get("MEDIQ_VLLM_MAX_MODEL_LEN", "").strip()
+                    max_model_len = int(env_m) if env_m else 8192
+                max_model_len = int(max_model_len)
+                mtok = self.args.get("max_tokens")
+                if isinstance(mtok, (int, float)) and mtok > 0:
+                    floor_len = int(mtok) + 8192
+                    if max_model_len < floor_len:
+                        max_model_len = floor_len
+                llm_kw = dict(
+                    model=self.model_name,
+                    enable_prefix_caching=enable_prefix_caching,
+                    tensor_parallel_size=tensor_parallel_size,
+                    max_num_seqs=max_num_seqs,
+                    max_model_len=max_model_len,
+                )
+                llm_kw["gpu_memory_utilization"] = gpu_mem
+                if self.args.get("vllm_enforce_eager") or os.environ.get(
+                    "MEDIQ_VLLM_ENFORCE_EAGER", ""
+                ).strip().lower() in ("1", "true", "yes"):
+                    llm_kw["enforce_eager"] = True
+                swap_s = os.environ.get("MEDIQ_VLLM_SWAP_SPACE_GB", "").strip()
+                if swap_s:
+                    llm_kw["swap_space"] = float(swap_s)
+                log_info(
+                    f"[vLLM] {self.model_name}: max_model_len={max_model_len}, max_num_seqs={max_num_seqs}, "
+                    f"gpu_memory_utilization={gpu_mem:.4f}"
+                    + (" (gpu util from free VRAM)" if _auto_gpu else ""),
+                    print_to_std=True,
+                )
+                self.model = LLM(**llm_kw)
                 from transformers import AutoTokenizer
                 self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
                 self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -110,14 +188,7 @@ class ModelCache:
         raw_text = self.tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True)
         log_info(f"[{self.model_name}][RAW OUTPUT]:\n{raw_text}")
         print(f"[LLM RAW OUTPUT]:\n{raw_text}\n")
-        # Strip Gemma 3 thinking block (<unused94>...<unused95>) if present
-        # Complete block: remove everything between the tags
-        stripped = re.sub(r'<[^>]+>.*?<[^>]+>', '', raw_text, flags=re.DOTALL).strip()
-        # Partial block (thinking cut off, no closing tag): take everything after the last '>'
-        if not stripped:
-            after_tag = re.split(r'>[^>]*$', raw_text)
-            stripped = after_tag[-1].strip() if len(after_tag) > 1 else raw_text.strip()
-        response_text = stripped
+        response_text = _strip_thinking(raw_text)
         usage = {"input_tokens": input_len, "output_tokens": outputs.shape[-1] - input_len}
         log_info(f"[{self.model_name}][PARSED OUTPUT]: {response_text}")
         return response_text, None, usage
@@ -138,7 +209,8 @@ class ModelCache:
                                         frequency_penalty=frequency_penalty, presence_penalty=presence_penalty)
         
         outputs = self.model.generate(inputs, sampling_params)
-        response_text = outputs[0].outputs[0].text
+        raw_text = outputs[0].outputs[0].text
+        response_text = _strip_thinking(raw_text)
         logprobs = outputs[0].outputs[0].cumulative_logprob
         # TODO: If top_logprobs > 0, return logprobs of generation
         # if self.top_logprobs > 0: logprobs = outputs[0].outputs[0].logprobs

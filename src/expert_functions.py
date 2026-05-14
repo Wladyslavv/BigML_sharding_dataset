@@ -1,3 +1,4 @@
+import re
 import prompts
 import expert_basics
 import logging
@@ -255,23 +256,27 @@ def numcutoff_abstention_decision(patient_state, rationale_generation, inquiry, 
 
 
 
-def scale_abstention_decision(patient_state, rationale_generation, inquiry, options_dict, abstain_threshold, **kwargs):
+def scale_abstention_decision(patient_state, rationale_generation, inquiry, options_dict, abstain_threshold, option_mode="yes-option", **kwargs):
     """
     Likert abstention strategy based on the current patient state.
     This function prompts the model to produce a likert scale confidence score of how confident it is in its decision, then decide abstention based on a cutoff
     """
     if not abstain_threshold: abstain_threshold = SCALE_THRESHOLD
 
-    # Get the response from the expert system
     prompt_key = "scale_RG" if rationale_generation else "scale"
     abstain_task_prompt = prompts.expert_system[prompt_key]
 
     patient_info = patient_state["initial_info"]
     conv_log = '\n'.join([f"{prompts.expert_system['question_word']}: {qa['question']}\n{prompts.expert_system['answer_word']}: {qa['answer']}" for qa in patient_state["interaction_history"]])
-    options_text = f'A: {options_dict["A"]}, B: {options_dict["B"]}, C: {options_dict["C"]}, D: {options_dict["D"]}'
-    
-    # first get the model's abstention decision
-    prompt_abstain = prompts.expert_system["curr_template"].format(patient_info, conv_log if conv_log != '' else 'None', inquiry, options_text, abstain_task_prompt)
+
+    hide = option_mode in ("no-option", "option-in-the-end")
+    if hide:
+        prompt_abstain = prompts.expert_system["curr_template_no_options"].format(
+            patient_info, conv_log if conv_log != '' else 'None', inquiry, abstain_task_prompt)
+    else:
+        options_text = f'A: {options_dict["A"]}, B: {options_dict["B"]}, C: {options_dict["C"]}, D: {options_dict["D"]}'
+        prompt_abstain = prompts.expert_system["curr_template"].format(
+            patient_info, conv_log if conv_log != '' else 'None', inquiry, options_text, abstain_task_prompt)
 
     messages = [
         {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
@@ -283,13 +288,27 @@ def scale_abstention_decision(patient_state, rationale_generation, inquiry, opti
     log_info(f"[ABSTENTION RESPONSE]: {confidence_rationale}\n")
     messages.append({"role": "assistant", "content": confidence_rationale})
 
-    # second, no matter what the model's abstention decision is, get an intermediate answer for evaluation and analysis
-    prompt_answer = prompts.expert_system["curr_template"].format(patient_info, conv_log if conv_log != '' else 'None', inquiry, options_text, prompts.expert_system["answer"])
-    messages_answer = [
-        {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
-        {"role": "user", "content": prompt_answer}
-    ]
-    shadow_answer, letter_choice, num_tokens_answer = expert_basics.expert_response_choice(messages_answer, options_dict, **kwargs)
+    # shadow answer: no-option / option-in-the-end → boxed answer; yes-option → letter choice
+    if hide:
+        prompt_answer = prompts.expert_system["curr_template_no_options"].format(
+            patient_info, conv_log if conv_log != '' else 'None', inquiry, prompts.expert_system["answer_boxed"])
+        messages_answer = [
+            {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
+            {"role": "user", "content": prompt_answer}
+        ]
+        shadow_answer, boxed_answer, num_tokens_answer = expert_basics.expert_response_boxed_answer(messages_answer, **kwargs)
+        letter_choice = None
+    else:
+        options_text = f'A: {options_dict["A"]}, B: {options_dict["B"]}, C: {options_dict["C"]}, D: {options_dict["D"]}'
+        prompt_answer = prompts.expert_system["curr_template"].format(
+            patient_info, conv_log if conv_log != '' else 'None', inquiry, options_text, prompts.expert_system["answer"])
+        messages_answer = [
+            {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
+            {"role": "user", "content": prompt_answer}
+        ]
+        shadow_answer, letter_choice, num_tokens_answer = expert_basics.expert_response_choice(messages_answer, options_dict, **kwargs)
+        boxed_answer = None
+
     num_tokens["input_tokens"] += num_tokens_answer["input_tokens"]
     num_tokens["output_tokens"] += num_tokens_answer["output_tokens"]
 
@@ -299,21 +318,78 @@ def scale_abstention_decision(patient_state, rationale_generation, inquiry, opti
         "confidence": conf_score,
         "confidence_rationale": confidence_rationale,
         "shadow_answer": shadow_answer,
+        "boxed_answer": boxed_answer,
         "usage": num_tokens,
         "messages": messages,
         "letter_choice": letter_choice,
     }
 
 
+def final_choice_with_options(patient_state, inquiry, options_dict, **kwargs):
+    """Used by option-in-the-end mode: after committing, make one call with options visible to get letter_choice."""
+    patient_info = patient_state["initial_info"]
+    conv_log = '\n'.join([f"{prompts.expert_system['question_word']}: {qa['question']}\n{prompts.expert_system['answer_word']}: {qa['answer']}" for qa in patient_state["interaction_history"]])
+    options_text = f'A: {options_dict["A"]}, B: {options_dict["B"]}, C: {options_dict["C"]}, D: {options_dict["D"]}'
+    prompt = prompts.expert_system["curr_template"].format(
+        patient_info, conv_log if conv_log != '' else 'None', inquiry, options_text, prompts.expert_system["answer"])
+    messages = [
+        {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
+        {"role": "user", "content": prompt}
+    ]
+    _, letter_choice, num_tokens = expert_basics.expert_response_choice(messages, options_dict, **kwargs)
+    log_info(f"[FINAL CHOICE WITH OPTIONS]: letter_choice: {letter_choice}\n")
+    return letter_choice, num_tokens
 
-def question_generation(patient_state, inquiry, options_dict, messages, independent_modules, **kwargs):
-    task_prompt = prompts.expert_system["atomic_question_improved"]
+
+def judge_answer(boxed_answer, true_answer, inquiry, **kwargs):
+    prompt = prompts.expert_system["judge"].format(inquiry, true_answer, boxed_answer)
+    messages = [
+        {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
+        {"role": "user", "content": prompt}
+    ]
+    response_text, judgment, num_tokens = expert_basics.expert_response_judge(messages, **kwargs)
+    log_info(f"[JUDGE RETURN]: judgment: {judgment}, response: {response_text}\n")
+    return judgment, response_text, num_tokens
+
+
+
+def _extract_question_rationale(response_text, atomic_question):
+    """Pull a one-sentence rationale out of the question-generator response.
+
+    Prefers an explicit `REASON:` line (as instructed by atomic_question_improved_RG).
+    Falls back to "everything except the atomic question line" so we still surface
+    whatever reasoning the model emitted, and finally to the full response.
+    """
+    if not response_text:
+        return None
+    for raw_line in response_text.splitlines():
+        line = raw_line.strip()
+        # accept "REASON:", "Reason -", "**REASON**:" etc.
+        if re.match(r'^\**\s*reason\b', line, flags=re.IGNORECASE):
+            cleaned = re.sub(r'^\**\s*reason\s*[:\-]\s*', '', line, flags=re.IGNORECASE).strip()
+            cleaned = cleaned.strip('*').strip()
+            if cleaned:
+                return cleaned
+    if atomic_question:
+        leftover = [ln for ln in response_text.splitlines() if atomic_question.strip() not in ln]
+        leftover_text = "\n".join(ln.strip() for ln in leftover if ln.strip())
+        if leftover_text:
+            return leftover_text
+    return response_text.strip()
+
+
+def question_generation(patient_state, inquiry, options_dict, messages, independent_modules, option_mode="yes-option", rationale_generation=False, **kwargs):
+    prompt_key = "atomic_question_improved_RG" if rationale_generation else "atomic_question_improved"
+    task_prompt = prompts.expert_system[prompt_key]
 
     if independent_modules:
         patient_info = patient_state["initial_info"]
         conv_log = '\n'.join([f"{prompts.expert_system['question_word']}: {qa['question']}\n{prompts.expert_system['answer_word']}: {qa['answer']}" for qa in patient_state["interaction_history"]])
-        options_text = f'A: {options_dict["A"]}, B: {options_dict["B"]}, C: {options_dict["C"]}, D: {options_dict["D"]}'
-        prompt = prompts.expert_system["curr_template"].format(patient_info, conv_log, inquiry, options_text, task_prompt)
+        if option_mode in ("no-option", "option-in-the-end"):
+            prompt = prompts.expert_system["curr_template_no_options"].format(patient_info, conv_log, inquiry, task_prompt)
+        else:
+            options_text = f'A: {options_dict["A"]}, B: {options_dict["B"]}, C: {options_dict["C"]}, D: {options_dict["D"]}'
+            prompt = prompts.expert_system["curr_template"].format(patient_info, conv_log, inquiry, options_text, task_prompt)
 
         messages = [
             {"role": "system", "content": prompts.expert_system["meditron_system_msg"]},
@@ -323,13 +399,17 @@ def question_generation(patient_state, inquiry, options_dict, messages, independ
         messages.append({"role": "user", "content": task_prompt})
 
     response_text, atomic_question, num_tokens = expert_basics.expert_response_question(messages, **kwargs)
+    question_rationale = _extract_question_rationale(response_text, atomic_question) if rationale_generation else None
     log_info(f"[ATOMIC QUESTION PROMPT]: {messages}")
     log_info(f"[ATOMIC QUESTION RESPONSE]: {atomic_question}\n")
+    if question_rationale:
+        log_info(f"[ATOMIC QUESTION RATIONALE]: {question_rationale}\n")
     messages.append({"role": "assistant", "content": atomic_question})
 
     log_info(f"[ATOMIC QUESTION RETURN]: {atomic_question}, usage: {num_tokens}\n")
     return {
         "atomic_question": atomic_question,
+        "question_rationale": question_rationale,
         "messages": messages,
         "usage": num_tokens,
     }
